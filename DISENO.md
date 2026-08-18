@@ -470,6 +470,39 @@ las ventas. Con tres condiciones expresas:
 - El refresco solo actualiza el estado de las butacas ajenas; no redibuja ni altera la selección
   del cliente.
 
+### Lenguaje, marco de trabajo y motor de base de datos
+
+**Por qué es una decisión mayor:** el diseño la había dejado abierta a propósito, pero condiciona
+directamente cómo se implementan las tres decisiones anteriores. En particular, el paso atómico
+de la Decisión mayor 2 —apoderarse de un apartado vencido sin borrar-luego-insertar— necesita que
+el motor soporte una sentencia de inserción-o-actualización condicionada de una sola vuelta; no
+todos los motores la ofrecen igual de limpia.
+
+| | A: Python + FastAPI + SQLite | B: Node/TypeScript + PostgreSQL | C: Java + Spring Boot + PostgreSQL |
+|---|---|---|---|
+| **Ajuste al paso atómico** | `INSERT … ON CONFLICT DO UPDATE … WHERE …` en una sola sentencia, con `RETURNING` para saber si ganó | Mismo mecanismo disponible en PostgreSQL, con el mismo `RETURNING` | El mismo mecanismo existe, pero un ORM (JPA/Hibernate) tiende a partirlo en lectura-más-escritura si no se escribe la consulta nativa a mano |
+| **Recursos operativos** | Un solo archivo, sin servidor de base de datos que administrar | Exige un servidor PostgreSQL aparte | Exige un servidor PostgreSQL aparte y una JVM |
+| **Ajuste al volumen (RNF-4, RNF-5)** | Sobra holgadamente: miles de filas por semana, decenas de sesiones concurrentes | Sobra igual, con más capacidad de la que se necesita | Sobra igual |
+| **Complejidad para exigir «sin ORM» en la escritura de ocupación** | Baja: `sqlite3` de la biblioteca estándar ejecuta SQL a la vista sin capas de por medio | Baja con un cliente SQL directo (`pg`), pero el ecosistema empuja hacia un ORM | Alta: hay que resistir el patrón habitual de Spring Data / JPA en el único punto donde no conviene |
+| **Riesgo** | Un solo proceso de escritura; conviene documentarlo porque SQLite serializa escrituras por diseño, lo cual aquí es una ventaja y no una limitación a esta escala | Ninguno adicional | El riesgo real es de disciplina del equipo, no del motor |
+
+**Elección: opción A — Python 3.11+, FastAPI con plantillas Jinja2, y SQLite en modo WAL sin
+ORM.** SQLite cumple exactamente lo que el diseño exige del motor —restricciones de unicidad y
+transacciones— y nada más que eso hace falta a la escala de RNF-5. Se prohíbe explícitamente un
+ORM para el módulo que escribe en la tabla de ocupación: la garantía de RNF-1 tiene que verse en
+el SQL a simple vista, no detrás de una capa que podría partir el paso atómico en dos. FastAPI y
+Jinja2 se escogen porque el recorrido del cliente es navegación de páginas con formularios —no
+hace falta una aplicación de una sola página— y porque Jinja2 sirve igual de bien las pantallas
+del cliente, la taquilla y la administración sin introducir un segundo lenguaje en el navegador
+más allá del refresco de 10 segundos de la Decisión mayor 3.
+
+**Con dos condiciones expresas:**
+- El módulo que escribe en la tabla de ocupación (`cine/mapa/`) usa SQL directo mediante la
+  biblioteca estándar `sqlite3`; ningún ORM intermedia esa escritura.
+- La conexión abre en modo WAL (`PRAGMA journal_mode = WAL`) y toda operación que cambia estado
+  abre su transacción con `BEGIN IMMEDIATE`, para que dos escrituras concurrentes descubran el
+  conflicto de una sola vez y no a medio camino.
+
 ## Otras decisiones
 
 | Decisión | Opciones consideradas | Elección | Razón |
@@ -490,8 +523,8 @@ las ventas. Con tres condiciones expresas:
 
 | Qué no se decidió | Quién lo decide y cuándo |
 |---|---|
-| Lenguaje, marco de trabajo y motor de base de datos | Quien implemente, al empezar. El diseño solo exige un motor relacional con restricciones de unicidad y transacciones |
-| Nivel de aislamiento de las transacciones y forma exacta de la operación atómica de apartado | Quien implemente, contra el motor elegido, con CA-1 y CA-6 como prueba |
+| ~~Lenguaje, marco de trabajo y motor de base de datos~~ | **Decidido**: Python + FastAPI + SQLite. Ver «Decisiones mayores → Lenguaje, marco de trabajo y motor de base de datos» |
+| Nivel de aislamiento de las transacciones y forma exacta de la operación atómica de apartado | Ya acotado por la decisión anterior a `BEGIN IMMEDIATE` y `INSERT … ON CONFLICT DO UPDATE … WHERE … RETURNING`; la redacción exacta de esa sentencia queda para el plan de construcción, con CA-1 y CA-6 como prueba |
 | Longitud y alfabeto del código de confirmación | Quien implemente, con el criterio de que se pueda dictar por teléfono sin ambigüedad |
 | Servicio concreto de envío de correo | El cine, al contratarlo. El componente Avisos ya lo tiene aislado |
 | Cadencia del reintento de avisos y cuántos intentos antes de rendirse | Quien implemente, al ponerlo en operación |
