@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+cine.db
+cine.db-*
+correos/
+*.log

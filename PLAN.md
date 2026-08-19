@@ -103,7 +103,7 @@ tests/
 
 ## Pieza 1 — Ver la cartelera y el mapa de una sala
 
-**Estado:** Pendiente
+**Estado:** Cerrada (2026-08-18)
 
 **Recorrido:** el cliente abre la cartelera de la semana desde el teléfono, ve las funciones que
 todavía no han empezado, entra a una y ve el mapa de la sala con el estado de cada butaca.
@@ -135,10 +135,37 @@ cartelera), RNF-6, CA-10.
    lateral solo dentro del mapa, nunca de la página completa.
 
 **Evidencia (al cerrar la pieza):**
-- [ ] Pruebas ejecutadas (comando y resultado):
-- [ ] Comprobación observable realizada (pasos seguidos y resultado):
-- [ ] Commit(s):
-- [ ] Notas / desviaciones del plan:
+- [x] **Pruebas ejecutadas:** `./.venv/Scripts/python -m pytest -v` → **13 passed, 1 warning
+  in 2.59s** (`tests/test_pieza01_cimientos.py`, `tests/test_pieza01_consultas.py`,
+  `tests/test_pieza01_pantallas.py`). El único warning es una advertencia de obsolescencia de
+  Starlette sobre `httpx` en `TestClient`, sin efecto funcional.
+- [x] **Comprobación observable realizada:** con `scripts/datos_prueba.py` (recrea `cine.db`,
+  siembra las dos salas, una película y dos funciones) y el servidor real
+  (`uvicorn cine.web.app:app`), verificado en el navegador a 375×812 px:
+  1. Función B (`/funcion/2`) con A-1 insertada a mano como `vendida`, A-2 como `apartada`
+     vigente, A-3 como `apartada` con `vence_en` ya pasado, A-4 como `bloqueada`: el mapa
+     mostró exactamente `vendida` / `apartada` (deshabilitada) / **`disponible`** / `no_vendible`
+     — la de vencimiento pasado apareció disponible, tal como exige la comprobación.
+  2. Función A (`/funcion/1`), sembrada para empezar 30 segundos después del arranque real:
+     estuvo en la cartelera antes de esa hora y, comprobado con el reloj real (no `RelojFijo`),
+     `GET /funcion/1` pasó de 200 a **410** exactamente al cruzar su hora de inicio, sin ninguna
+     intervención manual (CA-10 con el reloj real, además de la prueba automatizada que ya lo
+     cubre con `RelojFijo`).
+  3. Medido con JavaScript en el navegador a 375 px: `document.body.scrollWidth` (375) es igual
+     al ancho de la ventana (375) — **la página nunca se desplaza a lo ancho**; `mapa.scrollWidth`
+     (451) es mayor que `mapa.clientWidth` (343) — **el desplazamiento ocurre solo dentro del
+     mapa** (RNF-6).
+- [x] **Commit(s):** pendiente — se hace después de esta revisión, según lo acordado.
+- [x] **Notas / desviaciones del plan:** se corrigieron dos defectos reales que las pruebas
+  detectaron y que `PLAN.md` no había anticipado, ninguno cambia alcance ni requisitos:
+  (a) `sqlite3.Connection` necesitó `check_same_thread=False` en `cine/db.py`, porque
+  Starlette/FastAPI despachan las rutas síncronas en un hilo del pool distinto al que abre la
+  conexión; la seguridad de escritura la sigue dando `BEGIN IMMEDIATE`, no la afinidad de hilo.
+  (b) en `mapa.html` los atributos `data-butaca` y `data-estado` se unieron en la misma línea del
+  botón, para que coincidan sin ambigüedad con el contrato de marcado que la Pieza 2 va a
+  consumir. Se agregó además `scripts/datos_prueba.py` (datos de prueba reales para ejecutar la
+  comprobación, no previsto como archivo propio en `PLAN.md` pero exigido por la consigna de esta
+  ronda) y `.gitignore` (excluye `.venv/`, `cine.db*`, `__pycache__/`, `correos/`).
 
 ---
 

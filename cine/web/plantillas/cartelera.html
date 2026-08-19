@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block titulo %}Cartelera de la semana{% endblock %}
+{% block contenido %}
+<h1>Cartelera de la semana</h1>
+{% if not funciones %}
+  <p class="vacio">No hay funciones a la venta en este momento.</p>
+{% endif %}
+<ul class="cartelera">
+  {% for f in funciones %}
+  <li>
+    <a href="/funcion/{{ f.funcion_id }}">
+      <span class="titulo">{{ f.titulo }}</span>
+      <span class="detalle">{{ f.sala_nombre }} — {{ f.inicio.strftime('%d/%m %H:%M') }}</span>
+      {% if f.clasificacion_edad %}<span class="edad">{{ f.clasificacion_edad }}+</span>{% endif %}
+    </a>
+  </li>
+  {% endfor %}
+</ul>
+{% endblock %}

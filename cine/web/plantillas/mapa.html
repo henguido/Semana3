@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block titulo %}{{ funcion.titulo }}{% endblock %}
+{% block contenido %}
+<h1>{{ funcion.titulo }}</h1>
+<p class="detalle">{{ funcion.sala_nombre }} — {{ funcion.inicio.strftime('%d/%m %H:%M') }}</p>
+<p class="pantalla">PANTALLA</p>
+<div class="mapa" id="mapa" data-funcion="{{ funcion.funcion_id }}">
+  {% set actual = namespace(letra='') %}
+  {% for b in butacas %}
+    {% if b.fila != actual.letra %}
+      {% if not loop.first %}</div>{% endif %}
+      {% set actual.letra = b.fila %}
+      <div class="fila"><span class="etiqueta">{{ b.fila }}</span>
+    {% endif %}
+    <button type="button" class="butaca" data-butaca="{{ b.butaca_id }}" data-estado="{{ b.estado.value }}"{% if b.estado.value != 'disponible' %} disabled{% endif %}>{{ b.numero }}</button>
+    {% if loop.last %}</div>{% endif %}
+  {% endfor %}
+</div>
+<ul class="leyenda">
+  <li><span class="muestra" data-estado="disponible"></span>Disponible</li>
+  <li><span class="muestra" data-estado="apartada"></span>Apartada</li>
+  <li><span class="muestra" data-estado="vendida"></span>Vendida</li>
+  <li><span class="muestra" data-estado="no_vendible"></span>No vendible</li>
+</ul>
+<p class="detalle">La seleccion de butacas se habilita en la siguiente pieza del proyecto.</p>
+{% endblock %}
